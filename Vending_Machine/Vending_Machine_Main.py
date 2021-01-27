@@ -21,10 +21,11 @@ GPIO.setmode(GPIO.BCM)
 GPIO.cleanup()
 
 ##Cost of medicine
+Med = {1:"Crocin",2:"Paracetamol",3:"Saradon",4:"Diegene"}
 Money = {1:200,2:250,3:100,4:150} #MRP Rupees
 
 ##GSM variables
-GSM_conf = False
+GSM_conf = True
 admin_num = ""
 admin_config = False
 
@@ -42,12 +43,11 @@ lcd_d5 = 26
 lcd_d6 = 21
 lcd_d7 = 20
 lcd_backlight = 4 
-flag=1
 
 # Specify a 20x4 LCD.
 lcd_columns = 20
 lcd_rows    = 4
-
+flag_lcd = 0
 # Initialize the LCD using the pins above.
 lcd = LCD.Adafruit_CharLCD(lcd_rs, lcd_en, lcd_d4, lcd_d5, lcd_d6, lcd_d7,lcd_columns, lcd_rows, lcd_backlight)
 lcd.clear()
@@ -55,7 +55,7 @@ lcd.message('AUTOMATED VENDING')
 lcd.set_cursor(0,2)
 lcd.message('MACHINE')
 print("Automated Vending Machine")
-
+time.sleep(2)
 ir_detect = 9
 
 push_button_1 = 17
@@ -181,13 +181,16 @@ def check_data(data):
 ##Vending Machine Functions
 
 def Note_Enter(Medicine):
-    global flag
-    flag=1
     Medicine= Medicine
     Iteration = 0
     quit_flag=0
     count_out=0
     reset_flag=0
+    lcd.clear()
+    lcd.set_cursor(2,1)
+    lcd.message("Please Enter")
+    lcd.set_cursor(2,2)
+    lcd.message("The Note")
     while GPIO.input(ir_detect) == False and GPIO.input(reset_button)!= False:
         print("Note not detected")
         time.sleep(0.2) #Wait for 200ms
@@ -203,6 +206,9 @@ def Note_Enter(Medicine):
         while Motor_flag != 1 and reset_flag!=1 :
             if Iteration > 0:
                 idle_count=0
+                lcd.set_cursor(0,0)
+                lcd.message("Enter Note      ")
+                
                 while GPIO.input(ir_detect)==False:
                     print("Note not detected")
                     print(idle_count)
@@ -221,11 +227,14 @@ def Note_Enter(Medicine):
                     GPIO.output(rollerA,True)
                     GPIO.output(rollerB,False)
                 GPIO.output(rollerA,False)
-                GPIO.output(rollerB,False) 
-                Money_Now = Camera_Click()
+                GPIO.output(rollerB,False)
+                lcd.clear()
+                lcd.set_cursor(0,0)
+                lcd.message("Please Wait      ")
+                Money_Now = Camera_Click()         
                 print(Money_Now,"Money_Now")
                 Money_Needed = Money_Needed-Money_Now
-                print(Money_Needed,"Money_Needed")
+                #print(Money_Needed,"Money_Needed")
                 
                 if Money_Now == 0:
                     start = time.time()
@@ -246,8 +255,8 @@ def Note_Enter(Medicine):
                     stop = 0
                     while stop != 1 and GPIO.input(reset_button)!= False:
                         end = time.time()
-                        GPIO.output(rollerA,False)
-                        GPIO.output(rollerB,True)
+                        GPIO.output(rollerA,True)
+                        GPIO.output(rollerB,False)
                         rotate_time = 6 #Time in secs for rotation
                         if end-start >= rotate_time: 
                             GPIO.output(rollerA,False)
@@ -259,8 +268,8 @@ def Note_Enter(Medicine):
                     stop = 0
                     while stop != 1 and GPIO.input(reset_button)!= False:
                         end = time.time()
-                        GPIO.output(rollerA,False)
-                        GPIO.output(rollerB,True)
+                        GPIO.output(rollerA,True)
+                        GPIO.output(rollerB,False)
                         rotate_time = 6 #Time in secs for rotation
                         if end-start >= rotate_time: 
                             GPIO.output(rollerA,False)
@@ -274,44 +283,42 @@ def Note_Enter(Medicine):
                     stop = 0
                     while stop != 1 and GPIO.input(reset_button)!= False:
                         end = time.time()
-                        GPIO.output(rollerA,True)
-                        GPIO.output(rollerB,False)
+                        GPIO.output(rollerA,False)
+                        GPIO.output(rollerB,True)
                         rotate_time = 5 #Time in secs for rotation
                         if end-start >= rotate_time: 
                             GPIO.output(rollerA,False)
                             GPIO.output(rollerB,False) 
                             stop = 1
-                lcd.clear()
-                lcd.set_cursor(0,0)
-                lcd.message("Money Entered :")
-                lcd.set_cursor(2,1)
-                lcd.message("Rs "+str(Money_Now))
-                lcd.set_cursor(0,2)
-                lcd.message("Money Remaining :")
-                lcd.set_cursor(2,3)
-                lcd.message("Rs "+str(Money_Needed))
                 Iteration= Iteration+1
-                #print(Money_Needed)
+                print(Money_Needed)
+                if Money_Now != 0:
+                    lcd.clear()
+                    lcd.set_cursor(0,1)
+                    lcd.message("Cash Entered=Rs"+str(Money_Now))
+                    lcd.set_cursor(0,2)
+                    lcd.message("Cash Required=Rs"+str(Money_Needed))
                 
             if Motor_flag == 1:
-                Medicine_Motor(Medicine)
                 lcd.clear()
                 lcd.set_cursor(5,1)
-                lcd.message("Thank You")
-                send_sms("Medicine "+str(Medicine)+" bought",admin_num)    
+                lcd.message("THANK YOU")
+                lcd.set_cursor(5,2)
+                lcd.message("FOR BUYING")
+                Medicine_Motor(Medicine)
+                #send_sms("Medicine "+Medicine+" bought",admin_num)    
             
         
 def Camera_Click():
     global max_pt,max_val,max_kp
     capture = cv2.VideoCapture(0)
     ret, test_img = capture.read()
-    test_img = cv2.cvtColor(test_img,cv2.COLOR_BGR2GRAY)
     #test_img = read_img('/home/pi/main_test.jpg')
     orb = cv2.ORB_create()
     (kp1, des1) = orb.detectAndCompute(test_img, None)
 
     # Dataset Folder PATH goes here
-    FolderPath="/home/pi/main_dataset"
+    FolderPath="/home/pi/vending_machine/meta_data/main_dataset"
 
     #This automatically reads all the images in the dataset
     training_set = os.listdir(FolderPath)
@@ -349,7 +356,7 @@ def Camera_Click():
             train_img = cv2.imread(training_set[max_pt])
             img3 = cv2.drawMatchesKnn(test_img, kp1, train_img, max_kp, good, 4)
             
-            note = str(training_set[max_pt])[22:len(training_set[max_pt])]
+            note = str(training_set[max_pt])[48:len(training_set[max_pt])]
             print('Detected denomination: Rs. ', note)
             #(plt.imshow(img3), plt.show())
             count=0
@@ -357,6 +364,7 @@ def Camera_Click():
                 if ord(string)>= 57:
                     break
                 count=count+1
+            
             return int(note[0:count])
                     
     else:
@@ -436,44 +444,55 @@ while True:
                 sms_sent = False
         
     else:
-        if flag==1:
+##        if flag==0:
+##            send_sms("Check Message",admin_num)
+##            flag=1
+        if flag_lcd == 0:
             lcd.clear()
-            lcd.message('Medicine 1 : 200 Rs')
+            lcd.set_cursor(0,0)
+            lcd.message(Med[1])
+            lcd.set_cursor(14,0)
+            lcd.message("Rs")
+            lcd.set_cursor(16,0)
+            lcd.message(str(Money[1]))
             lcd.set_cursor(0,1)
-            lcd.message('Medicine 2 : 250 Rs')
+            lcd.message(Med[2])
+            lcd.set_cursor(14,1)
+            lcd.message("Rs")
+            lcd.set_cursor(16,1)
+            lcd.message(str(Money[2]))
             lcd.set_cursor(0,2)
-            lcd.message('Medicine 2 : 150 Rs')
+            lcd.message(Med[3])
+            lcd.set_cursor(14,2)
+            lcd.message("Rs")
+            lcd.set_cursor(16,2)
+            lcd.message(str(Money[3]))
             lcd.set_cursor(0,3)
-            lcd.message('Medicine 2 : 100 Rs')
-            flag=0
+            lcd.message(Med[4])
+            lcd.set_cursor(14,3)
+            lcd.message("Rs")
+            lcd.set_cursor(16,3)
+            lcd.message(str(Money[4]))
+            flag_lcd = 1
             
         if GPIO.input(push_button_1)==False: #Check if Push Button 1 is pressed
-            lcd.clear()
-            lcd.set_cursor(5,1)
-            lcd.message('Enter Note')
             print("Button 1 Pressed")
             Note_Enter(1)
+            flag_lcd = 0
 
         if GPIO.input(push_button_2)==False: #Check if Push Button 2 is pressed
-            lcd.clear()
-            lcd.set_cursor(5,1)
-            lcd.message('Enter Note')
             print("Button 2 Pressed")
             Note_Enter(2)
-
+            flag_lcd = 0
+            
         if GPIO.input(push_button_3)==False: #Check if Push Button 3 is pressed
-            lcd.clear()
-            lcd.set_cursor(5,1)
-            lcd.message('Enter Note')
             print("Button 3 Pressed")
             Note_Enter(3)
+            flag_lcd = 0
             
         if GPIO.input(push_button_4)==False: #Check if Push Button 4 is pressed
-            lcd.clear()
-            lcd.set_cursor(5,1)
-            lcd.message('Enter Note')
             print("Button 4 Pressed")
             Note_Enter(4)
-
+            flag_lcd = 0
 
             
